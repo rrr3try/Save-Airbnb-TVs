@@ -1,26 +1,24 @@
 import Foundation
 
 /// A capture-output pipe whose blocked reader can be cancelled from another thread.
-/// Each read owns a duplicate fd, preventing close/reuse races during Stop.
+/// A read retains its handle until it returns, preventing close/reuse races during Stop.
 final class CapturePipeReader {
     private let lock = NSLock()
-    private var fd: Int32 = -1
+    private var handle: FileHandle?
     private var closed = false
 
     func open(_ handle: FileHandle) throws {
+        lock.lock(); defer { lock.unlock() }
+        guard !closed, self.handle == nil else { throw POSIXError(.EBADF) }
         let copy = dup(handle.fileDescriptor)
         guard copy >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EBADF) }
-        lock.lock(); defer { lock.unlock() }
-        guard !closed, fd < 0 else { Darwin.close(copy); throw POSIXError(.EBADF) }
-        fd = copy
+        self.handle = FileHandle(fileDescriptor: copy, closeOnDealloc: true)
     }
 
     func read(_ maxBytes: Int) -> Data {
-        guard maxBytes > 0 else { return Data() }
-        let reader = lock.withLock { closed || fd < 0 ? -1 : dup(fd) }
-        guard reader >= 0 else { return Data() }
-        defer { Darwin.close(reader) }
-        var pollFD = pollfd(fd: reader, events: Int16(POLLIN), revents: 0)
+        guard maxBytes > 0, let reader = lock.withLock({ handle }) else { return Data() }
+        defer { withExtendedLifetime(reader) {} }
+        var pollFD = pollfd(fd: reader.fileDescriptor, events: Int16(POLLIN), revents: 0)
         while !lock.withLock({ closed }) {
             let ready = poll(&pollFD, 1, 100)
             if ready < 0 {
@@ -30,7 +28,7 @@ final class CapturePipeReader {
             if ready == 0 { continue }
             if lock.withLock({ closed }) { return Data() }
             var bytes = [UInt8](repeating: 0, count: maxBytes)
-            let count = Darwin.read(reader, &bytes, bytes.count)
+            let count = Darwin.read(reader.fileDescriptor, &bytes, bytes.count)
             if count < 0 && errno == EINTR { continue }
             return count > 0 ? Data(bytes.prefix(count)) : Data()
         }
@@ -38,14 +36,9 @@ final class CapturePipeReader {
     }
 
     func close() {
-        let old = lock.withLock {
+        lock.withLock {
             closed = true
-            let old = fd
-            fd = -1
-            return old
+            handle = nil
         }
-        if old >= 0 { Darwin.close(old) }
     }
-
-    deinit { close() }
 }
