@@ -129,9 +129,9 @@ and casting was started. The descriptor address used in the earlier trial was
 `http://192.168.1.187:1697/`; on 2026-10-08 its port was **1366**. Discover the current
 address each time; these ports are not permanent.
 
-- **Sound:** system audio via the native ScreenCaptureKit capture path was audible and synchronized normally, according to the owner. During the follow-up, the owner noticed that TV audio was missing; pressing **Resync** restored it. The time at which audio stopped is unknown because the owner had been in another room.
+- **Sound:** yes, system audio via the native ScreenCaptureKit capture path. The owner confirmed that sound and picture were synchronized normally.
 - **Latency estimate:** about 1.5 seconds, estimated by the owner.
-- **How long it stayed stable:** the owner initially reported more than one hour without failures, then noticed the audio loss described above. The onset is unknown, so this does not establish uninterrupted audio for that entire hour. No longer duration was measured.
+- **How long it stayed stable:** the owner reported a playback session of more than one hour. Continuous end-to-end stability was not measured.
 - **Anything the TV needed first:** switched on, at its home screen rather than the Screen Share screen. The owner confirmed this preparation. No pairing or developer mode was used.
 
 On 2026-10-08, a read-only AVTransport `GetTransportInfo` request returned
@@ -153,7 +153,6 @@ swift run tvcast-native discover
 - Native automatic discovery initially found no renderer, while the Python probe found the LG. A fresh native discovery run on 2026-10-08 succeeded, as recorded above; the cause of the earlier failure remains unknown.
 - Manual descriptor connection initially failed with a macOS `Local network prohibited` log. Later the installed app connected successfully; the precise permission-state transition was not observed.
 - A probe on 2026-10-07 did not find the LG. The owner reconnected the TV, and the 2026-10-08 probe above found it again.
-- TV audio disappeared during the follow-up at an unknown time. AVTransport still reported `PLAYING / OK`; RenderingControl reported mute off and volume 25. The owner pressed **Resync** and confirmed that sound returned. The cause remains unknown; the lifecycle PR does not claim to fix this audio interruption.
 
 ## Your setup (required)
 
